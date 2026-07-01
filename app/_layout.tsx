@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Image, useColorScheme } from 'react-native';
+import { View, Image, Text, useColorScheme } from 'react-native';
 import { Stack } from 'expo-router';
-import { PaperProvider } from 'react-native-paper';
+import { Button, PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -15,17 +15,29 @@ export default function RootLayout() {
   const { colorScheme } = useSettingsStore();
   const loadExpenses = useExpenseStore((s) => s.loadExpenses);
   const [ready, setReady] = useState(false);
+  const [startupError, setStartupError] = useState<string | null>(null);
 
   const resolvedScheme =
     colorScheme === 'system' ? systemColorScheme ?? 'light' : colorScheme;
   const theme = resolvedScheme === 'dark' ? darkTheme : lightTheme;
 
-  useEffect(() => {
-    (async () => {
+  async function bootstrap() {
+    setStartupError(null);
+    try {
       await getDatabase();
       await loadExpenses();
+    } catch (error) {
+      console.error('App bootstrap failed', error);
+      setStartupError(
+        'Unable to load saved expenses right now. You can keep using the app and retry loading.'
+      );
+    } finally {
       setReady(true);
-    })();
+    }
+  }
+
+  useEffect(() => {
+    void bootstrap();
   }, []);
 
   if (!ready) {
@@ -45,6 +57,29 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <PaperProvider theme={theme}>
           <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
+          {startupError ? (
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                backgroundColor: theme.colors.errorContainer,
+              }}
+            >
+              <Text
+                style={{
+                  color: theme.colors.onErrorContainer,
+                  fontSize: 14,
+                  lineHeight: 20,
+                  marginBottom: 8,
+                }}
+              >
+                {startupError}
+              </Text>
+              <Button mode="contained" onPress={() => void bootstrap()}>
+                Retry loading
+              </Button>
+            </View>
+          ) : null}
           <Stack screenOptions={{ headerShown: false }} />
         </PaperProvider>
       </SafeAreaProvider>
